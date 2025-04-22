@@ -1,6 +1,7 @@
 using JwtCookieAuthApi.Data;
 using JwtCookieAuthApi.Models;
 using JwtCookieAuthApi.Services;
+using JwtCookieAuthApi.Services.IServices;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -9,16 +10,15 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 🔐 Configurações JWT
 var jwtKey = builder.Configuration["Jwt:Key"];
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"];
 
-// 📦 Serviços
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<ICookieService, CookieService>();
 
 builder.Services.AddAuthentication(options =>
 {
@@ -38,7 +38,6 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey!))
     };
 
-    // 🍪 Lê o token do cookie
     options.Events = new JwtBearerEvents
     {
         OnMessageReceived = context =>
@@ -52,13 +51,14 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+Console.WriteLine($"🌍 Ambiente ativo: {builder.Environment.EnvironmentName}");
+
 builder.Services.AddAuthorization();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// 🔧 Middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -68,7 +68,6 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
-// ✅ Registro
 app.MapPost("/register", async (User user, AppDbContext db) =>
 {
     var exists = await db.Users.AnyAsync(u => u.Username == user.Username);
@@ -82,8 +81,7 @@ app.MapPost("/register", async (User user, AppDbContext db) =>
     return Results.Ok("Usuário registrado com sucesso");
 });
 
-// 🔐 Login
-app.MapPost("/login", async (LoginRequest login, AppDbContext db, TokenService tokenService, HttpResponse response) =>
+app.MapPost("/login", async (LoginRequest login, AppDbContext db, TokenService tokenService, ICookieService cookieService, HttpResponse response) =>
 {
     var user = await db.Users.FirstOrDefaultAsync(u =>
         u.Username == login.Username && u.Password == login.Password);
@@ -92,26 +90,17 @@ app.MapPost("/login", async (LoginRequest login, AppDbContext db, TokenService t
         return Results.Unauthorized();
 
     var token = tokenService.GenerateToken(user);
-
-    response.Cookies.Append("jwtToken", token, new CookieOptions
-    {
-        HttpOnly = true,
-        Secure = true,
-        SameSite = SameSiteMode.Strict,
-        Expires = DateTimeOffset.UtcNow.AddHours(1)
-    });
+    cookieService.SetJwtCookie(response, token, TimeSpan.FromHours(1));
 
     return Results.Ok("Login realizado com sucesso");
 });
 
-app.MapPost("/logout", (HttpResponse response) =>
+app.MapPost("/logout", (HttpResponse response, ICookieService cookieService) =>
 {
-    response.Cookies.Delete("jwtToken");
-
+    cookieService.ClearJwtCookie(response);
     return Results.Ok("Logout realizado com sucesso");
 });
 
-// 🔒 Endpoint protegido
 app.MapGet("/me", (ClaimsPrincipal user) =>
 {
     var username = user.FindFirst("username")?.Value;
