@@ -1,13 +1,13 @@
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using JwtCookieAuthApi.Models;
 using System.Text;
-
+using JwtCookieAuthApi.Models;
+using JwtCookieAuthApi.Services.IServices;
 
 namespace JwtCookieAuthApi.Services;
 
-public class TokenService
+public class TokenService : ITokenService
 {
     private readonly IConfiguration _config;
 

@@ -1,0 +1,40 @@
+# ⚙️ Build folders
+bin/
+obj/
+.vs/
+
+# 📄 Arquivos temporários do usuário
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# 🛠️ Arquivos de build e cache
+*.log
+*.cache
+*.db
+*.pfx
+*.Publish.xml
+*.PublishSettings
+
+# ⚠️ Configurações sensíveis (dev only)
+appsettings.Development.json
+
+# 📦 Pacotes NuGet gerados (caso use)
+*.nupkg
+*.snupkg
+
+# 🧪 Resultados de testes
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# 🔍 VS Code configs (exceto settings e launch)
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+
+# 💡 Rider/JetBrains
+.idea/
+*.sln.iml

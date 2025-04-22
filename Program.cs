@@ -17,7 +17,7 @@ var jwtAudience = builder.Configuration["Jwt:Audience"];
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<ITokenService,TokenService>();
 builder.Services.AddScoped<ICookieService, CookieService>();
 
 builder.Services.AddAuthentication(options =>
@@ -75,18 +75,19 @@ app.MapPost("/register", async (User user, AppDbContext db) =>
         return Results.BadRequest("Usuário já existe");
 
     user.Id = Guid.NewGuid();
+    user.Password = BCrypt.Net.BCrypt.HashPassword(user.Password);
+
     await db.Users.AddAsync(user);
     await db.SaveChangesAsync();
 
     return Results.Ok("Usuário registrado com sucesso");
 });
 
-app.MapPost("/login", async (LoginRequest login, AppDbContext db, TokenService tokenService, ICookieService cookieService, HttpResponse response) =>
+app.MapPost("/login", async (LoginRequest login, AppDbContext db, ITokenService tokenService, ICookieService cookieService, HttpResponse response) =>
 {
-    var user = await db.Users.FirstOrDefaultAsync(u =>
-        u.Username == login.Username && u.Password == login.Password);
-
-    if (user is null)
+    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == login.Username);
+    
+    if (user is null || !BCrypt.Net.BCrypt.Verify(login.Password, user.Password))
         return Results.Unauthorized();
 
     var token = tokenService.GenerateToken(user);
@@ -94,6 +95,7 @@ app.MapPost("/login", async (LoginRequest login, AppDbContext db, TokenService t
 
     return Results.Ok("Login realizado com sucesso");
 });
+
 
 app.MapPost("/logout", (HttpResponse response, ICookieService cookieService) =>
 {
